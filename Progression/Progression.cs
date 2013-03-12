@@ -9,22 +9,36 @@ using System.Threading.Tasks;
 
 namespace Progression
 {
-    public abstract class AuditedEntityBase<TEntity> : TableEntity where TEntity : AuditedEntityBase<TEntity>
+    /// <summary>
+    /// EntityBase type that uses reflection to set a table name and entity type properties.
+    /// </summary>
+    /// <typeparam name="TEntity">The type of entity</typeparam>
+    public abstract class EntityBase<TEntity> : TableEntity where TEntity : AuditedEntityBase<TEntity>
     {
-        private static readonly string _entityType;
-        static AuditedEntityBase() { _entityType = typeof(TEntity).FullName; }
-
-        public abstract string TableName { get; }
-        public abstract string MakeRowKey();
-        public string EntityType { get; set; }
-        public string AuditRecord { get; set; }
-
-        public AuditedEntityBase()
-        {
-            EntityType = _entityType;
+        protected static readonly string _entityType;
+        protected static readonly string _tableName;
+        static EntityBase()
+        { 
+            _entityType = typeof(TEntity).FullName;
+            _tableName = GetTableName();
         }
 
+        public string TableName { get { return _tableName; } }
+        public string EntityType { get { return _entityType; } set { } }
+
+        public static string GetTableName()
+        {
+            var attrs = typeof(TEntity).GetCustomAttributes(typeof(TableNameAttribute), true).FirstOrDefault() as TableNameAttribute;
+            return attrs != null ? attrs.Name : typeof(TEntity).Name.Replace("Entity", string.Empty);
+        }
+    }
+
+    public abstract class AuditedEntityBase<TEntity> : EntityBase<TEntity> where TEntity : AuditedEntityBase<TEntity>
+    {
+        public string AuditRecord { get; set; }
         public int Version { get; set; }
+
+        public abstract string MakeRowKey();
 
         public async Task Save(CloudTable table, string audit)
         {
@@ -35,21 +49,19 @@ namespace Progression
         }
     }
 
+    [TableName("Player")]
     public class ProgressionEntity : AuditedEntityBase<ProgressionEntity>
     {
         #region constants
         private const string TitleId = "SomeGame";
-        private const string _tableName = "Player";
         private const string _rowKey = "Progression";
         private const string _rowKeyEnd = "Progression_~";
         #endregion
         #region Table Stuff
-        public override string TableName { get { return _tableName; } }
         public ProgressionEntity()
         {
         }
         #endregion
-
 
         public ProgressionEntity(ulong playerId)
         {
@@ -85,36 +97,4 @@ namespace Progression
         }
     }
 
-    public static class AsyncHelpers
-    {
-        public static IEnumerable<TEntity> QueryAll<TEntity>(this CloudTable table, string filter) where TEntity : AuditedEntityBase<TEntity>, new()
-        {
-            LogManager.GetCurrentClassLogger().Info("Query Filter: {0}", filter);
-            var query = new TableQuery<TEntity>().Where(filter);
-            TableQuerySegment<TEntity> currentSegment = null;
-
-            while (currentSegment == null || currentSegment.ContinuationToken != null)
-            {
-                var token = currentSegment != null ? (TableContinuationToken)currentSegment.ContinuationToken : null;
-                currentSegment = table.ExecuteQuerySegmented(query, token);
-                foreach (var item in currentSegment.Results)
-                {
-                    yield return item;
-                }
-            }
-            //Task.Factory.FromAsync<ResultSegment<TEntity>>(, table.EndExecuteQuerySegmented<TEntity>, query, null, null);
-        }
-        public static async Task<bool> AsyncCreateIfNotExist(this CloudTable table)
-        {
-            return await Task.Factory.FromAsync<bool>(table.BeginCreateIfNotExists, table.EndCreateIfNotExists, null);
-        }
-        public static async Task<TEntity> GetSingle<TEntity>(this CloudTable table, string pk, string rk) where TEntity : AuditedEntityBase<TEntity>, new()
-        {
-            return (await table.AsyncExecute(TableOperation.Retrieve<TEntity>(pk, rk))).Result as TEntity;
-        }
-        public static async Task<TableResult> AsyncExecute(this CloudTable table, TableOperation operation)
-        {
-            return await Task.Factory.FromAsync<TableOperation, TableResult>(table.BeginExecute, table.EndExecute, operation, null);
-        }
-    }
 }

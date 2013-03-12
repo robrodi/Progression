@@ -1,13 +1,10 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Progression;
-using FluentAssertions;
-using Microsoft.WindowsAzure.Storage.Table;
+﻿using FluentAssertions;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Table;
+using Progression;
+using System;
+using System.Linq;
 namespace Tests
 {
     [TestClass]
@@ -69,6 +66,22 @@ namespace Tests
 
             var result = ProgressionEntity.Get(table, xuid).ToArray();
             result.Length.Should().Be(numEntities);
+        }
+
+        [TestMethod]
+        public void GetTableName()
+        {
+            AuditedEntityBase<ProgressionEntity>.GetTableName().Should().Be("Player");
+        }
+
+        [TestMethod]
+        public void GetTableName_NoAttr() {
+            AuditedEntityBase<CrapEntity>.GetTableName().Should().Be("Crap");
+
+        }
+        private class CrapEntity : AuditedEntityBase<CrapEntity>
+        {
+            public override string MakeRowKey() { return "crap"; }
         }
     }
 }
