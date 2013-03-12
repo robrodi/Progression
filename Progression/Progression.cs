@@ -9,14 +9,6 @@ using System.Threading.Tasks;
 
 namespace Progression
 {
-    public interface IThingy
-    {
-        string TableName { get; }
-        int Version { get; }
-        string MakeRowKey();
-        string EntityType { get; }
-    }
-
     public abstract class AuditedEntityBase<TEntity> : TableEntity where TEntity : AuditedEntityBase<TEntity>
     {
         private static readonly string _entityType;
@@ -32,7 +24,6 @@ namespace Progression
             EntityType = _entityType;
         }
 
-        protected readonly CloudTable table;
         public int Version { get; set; }
 
         public async Task Save(CloudTable table, string audit)
@@ -43,7 +34,7 @@ namespace Progression
             await table.AsyncExecute(TableOperation.Insert((TEntity)this));
         }
     }
-    public class ProgressionEntity : AuditedEntityBase<ProgressionEntity>, IThingy
+    public class ProgressionEntity : AuditedEntityBase<ProgressionEntity>
     {
         #region constants
         private const string TitleId = "SomeGame";
