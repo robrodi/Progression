@@ -1,5 +1,6 @@
 ﻿using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
+using NLog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,40 +12,74 @@ namespace Progression
     public interface IThingy
     {
         string TableName { get; }
+        int Version { get; }
+        string MakeRowKey();
+
     }
-    public class ProgressionEntity : TableEntity, IThingy
+    public abstract class EBase<TEntity> : TableEntity where TEntity : EBase<TEntity>
     {
-        public ProgressionEntity()
+        public abstract string TableName { get; }
+        public abstract string MakeRowKey();
+
+        protected Logger logger = LogManager.GetCurrentClassLogger();
+        static readonly CloudTableClient tableClient = CloudStorageAccount.DevelopmentStorageAccount.CreateCloudTableClient();
+        public EBase()
         {
+            table = GetTable();
+        }
+        protected CloudTable GetTable() {  return GetTable(TableName); }
+        protected static CloudTable GetTable(string tableName) { return tableClient.GetTableReference(tableName); }
+        protected readonly CloudTable table;
+        public int Version { get; set; }
+
+        public async Task Save()
+        {
+
+            this.Version = Version + 1;
+            this.RowKey = MakeRowKey();
+            await table.AsyncExecute(TableOperation.Insert((TEntity)this));
+        }
+    }
+    public class ProgressionEntity : EBase<ProgressionEntity>, IThingy
+    {
+        #region Table Stuff
+        static ProgressionEntity()
+        {
+            GetTable(_tableName).AsyncCreateIfNotExist().Wait();
         }
         const string TitleId = "SomeGame";
         private const string _tableName = "Player";
         private const string _rowKey = "Progression";
-        static readonly CloudTableClient tableClient = CloudStorageAccount.DevelopmentStorageAccount.CreateCloudTableClient();
-        static readonly CloudTable table = tableClient.GetTableReference(_tableName);
-        static ProgressionEntity() 
+
+        public override string TableName { get { return _tableName; } }
+        public string WTF { get; set; }
+        public ProgressionEntity()
         {
-            table.AsyncCreateIfNotExist().Wait();
         }
-        public string TableName { get { return _tableName; }}
+#endregion
         public ProgressionEntity(ulong playerId)
         {
             this.PartitionKey = MakePk(playerId);
-            this.RowKey = _rowKey;
+            logger.Info("x  Version: {0}", Version);
         }
 
         private static string MakePk(ulong playerId)
         {
             return string.Format("{0}_{1:x16}", TitleId, playerId);
         }
-        public async Task Save() 
+        public override string MakeRowKey()
         {
-            await table.AsyncExecute(TableOperation.Insert(this));
+            return MakeRowKey(Version);
         }
-        public static async Task<ProgressionEntity> Get(ulong playerId)
+        private static string MakeRowKey(int version) { return string.Format("{0}_{1}", _rowKey, version); }
+
+        
+        public static async Task<ProgressionEntity> Get(ulong playerId, int version)
         {
-            return (await table.AsyncExecute(TableOperation.Retrieve<ProgressionEntity>(MakePk(playerId), _rowKey))).Result as ProgressionEntity;
+            LogManager.GetCurrentClassLogger().Info("Getting {0} : {1}", MakePk(playerId), MakeRowKey(version));
+            return (await GetTable(_tableName).AsyncExecute(TableOperation.Retrieve<ProgressionEntity>(MakePk(playerId), MakeRowKey(version)))).Result as ProgressionEntity;
         }
+       
     }
     public static class WTF
     {
