@@ -86,6 +86,24 @@ namespace Tests
         }
 
         [TestMethod]
+        public void InsertAndGetAllWithResolver_UnknownType()
+        {
+            ulong playerId = (ulong)new Random().Next();
+            var entity1 = new ProgressionEntity(playerId) { Xp = 12345 };
+            var entity2 = new UnknownEntity { PartitionKey = entity1.PartitionKey, RowKey = "O Hai" };
+
+            entity1.Save(table, "Created").Wait();
+            table.AsyncExecute(TableOperation.Insert(entity2)).Wait();
+            var result = table.QueryAll<TableEntity>(string.Format("(PartitionKey eq '{0}')", ProgressionEntity.MakePk(playerId)), EntityRegistry.GetAllKnownTypesResolver).ToArray();
+            result.Length.Should().Be(2);
+            result.Any(e => e.GetType() == typeof(ProgressionEntity)).Should().BeTrue("Progression not found");
+            result.Any(e => e.GetType() == typeof(TableEntity)).Should().BeTrue("unknown entity not found");
+            var p = result.First(e => e.GetType() == typeof(ProgressionEntity)) as ProgressionEntity;
+            p.Version.Should().Be(1);
+            p.Xp.Should().Be(12345);
+        }
+
+        [TestMethod]
         public void GetTableName()
         {
             ImmutableEntityBase<ProgressionEntity>.GetTableName().Should().Be("Player");
@@ -94,6 +112,10 @@ namespace Tests
         [TestMethod]
         public void GetTableName_NoAttr() {
             ImmutableEntityBase<CrapEntity>.GetTableName().Should().Be("Crap");
+        }
+        private class UnknownEntity : TableEntity 
+        {
+            public string EntityType { get { return typeof(UnknownEntity).FullName; } set { } }
         }
         private class CrapEntity : ImmutableEntityBase<CrapEntity>
         {

@@ -32,6 +32,19 @@ namespace Progression
                                                                             string etag) 
         {
             string shapeType = properties["EntityType"].StringValue;
+            TableEntity result = ResolveType(shapeType);
+
+            result.PartitionKey = partitionKey;
+            result.RowKey = rowKey;
+            result.Timestamp = timestamp;
+            result.ETag = etag;
+            result.ReadEntity(properties, null);
+
+            return result;
+        }
+
+        private static TableEntity ResolveType(string shapeType)
+        {
             TableEntity result = null;
             if (types.ContainsKey(shapeType))
             {
@@ -41,15 +54,21 @@ namespace Progression
             else
             {
                 logger.Info("ShapeType Not Found: {0}", shapeType);
-                result = new TableEntity();
+                // try register
+                var t = Type.GetType(shapeType);
+                if (t != null)
+                {
+                    logger.Info("ShapeType resolved and registered: {0}", shapeType);
+                    if (t.IsSubclassOf(typeof(TableEntity)))
+                    {
+                        Register(t);
+                        result = Activator.CreateInstance(types[shapeType]) as TableEntity;
+                    }
+                    else throw new ArgumentOutOfRangeException("Type is not a subclass of Table Entity and cannot be resolved");
+                }
+                else
+                    result = new TableEntity();
             }
-
-            result.PartitionKey = partitionKey;
-            result.RowKey = rowKey;
-            result.Timestamp = timestamp;
-            result.ETag = etag;
-            result.ReadEntity(properties, null);
-
             return result;
         }
     }
