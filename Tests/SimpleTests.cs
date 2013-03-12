@@ -23,7 +23,7 @@ namespace Tests
         {
             ulong xuid = (ulong)new Random().Next();
             var entity = new ProgressionEntity(xuid);
-            entity.Save().Wait();
+            entity.Save("Created").Wait();
 
             var result = ProgressionEntity.Get(xuid, 1);
             result.Result.Should().NotBeNull();
@@ -34,19 +34,30 @@ namespace Tests
         {
             ulong xuid = (ulong)new Random().Next();
             var entity = new ProgressionEntity(xuid);
-            entity.Save().Wait();
-            entity.Save().Wait();
-            entity.Save().Wait();
-            entity.Save().Wait();
-            entity.Save().Wait();
-            entity.Save().Wait();
+            const int numEntities = 6;
+            for (var i = 0; i < numEntities; i++)
+                entity.Save("edit " + i).Wait();
 
-            for (var i = 1; i <= 2; i++)
+            for (var i = 1; i <= numEntities; i++)
             {
                 var result = ProgressionEntity.Get(xuid, i).Result;
                 result.Should().NotBeNull("v{0} is null", i);
                 result.Version.Should().Be(i, "v{0} version should be {0}", i);
             }
+        }
+
+        [TestMethod]
+        public void InsertAndSimpleGetAll()
+        {
+            ulong xuid = (ulong)new Random().Next();
+            var entity = new ProgressionEntity(xuid);
+            const int numEntities = 6;
+            for (var i = 0; i < numEntities; i++) 
+                entity.Save("edit " + i).Wait();
+            
+
+            var result = ProgressionEntity.Get(xuid).ToArray();
+            result.Length.Should().Be(numEntities);
         }
     }
 }
