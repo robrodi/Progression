@@ -16,9 +16,9 @@ namespace Progression
         private static readonly Dictionary<string, Type> types = new Dictionary<string, Type>();
 
         /// <summary>
-        /// Registers a type to 
+        /// Registers a  type to be generated in <see cref="GetAllKnownTypesResolver"/> if a matching &quot;EntityType&quot; column is populated.
         /// </summary>
-        /// <param name="t"></param>
+        /// <param name="t">The type to register.</param>
         public static void Register(Type t)
         {
             // lock + doublecheck
@@ -33,6 +33,15 @@ namespace Progression
             }
         }
 
+        /// <summary>
+        /// An implementation of the <see cref="EntityResolver<TableEntity>"/> delegate that uses the <see cref="EntityBase<T>.EntityType"/> column to generate an instance of an entity and populate its properties.
+        /// </summary>
+        /// <param name="partitionKey">The pk.</param>
+        /// <param name="rowKey">The rk.</param>
+        /// <param name="timestamp">The last updated time.</param>
+        /// <param name="properties">The property collection.</param>
+        /// <param name="etag">The etag.</param>
+        /// <returns>A populated table entity.</returns>
         public static TableEntity GetAllKnownTypesResolver(string partitionKey,
                                                                             string rowKey,
                                                                             DateTimeOffset timestamp,
