@@ -9,11 +9,55 @@ using System.Threading.Tasks;
 
 namespace Progression
 {
+    public static class EntityRegistry
+    {
+        static readonly Logger logger = LogManager.GetCurrentClassLogger();
+        private static object Mutex = new object();
+        private static readonly Dictionary<string, Type> types = new Dictionary<string, Type>();
+
+        public static void Register(Type t) 
+        {
+            // lock + doublecheck
+            if (types.ContainsKey(t.FullName)) return;
+            lock (Mutex)
+            {
+                if (types.ContainsKey(t.FullName)) return;
+                types.Add(t.FullName, t);
+            }
+        }
+        public static TableEntity GetAllKnownTypesResolver(string partitionKey, 
+                                                                            string rowKey, 
+                                                                            DateTimeOffset timestamp,
+                                                                            IDictionary<string, EntityProperty> properties,
+                                                                            string etag) 
+        {
+            string shapeType = properties["EntityType"].StringValue;
+            TableEntity result = null;
+            if (types.ContainsKey(shapeType))
+            {
+                logger.Info("ShapeType Found: {0}", shapeType);
+                result = Activator.CreateInstance(types[shapeType]) as TableEntity;
+            }
+            else
+            {
+                logger.Info("ShapeType Not Found: {0}", shapeType);
+                result = new TableEntity();
+            }
+
+            result.PartitionKey = partitionKey;
+            result.RowKey = rowKey;
+            result.Timestamp = timestamp;
+            result.ETag = etag;
+            result.ReadEntity(properties, null);
+
+            return result;
+        }
+    }
     /// <summary>
     /// EntityBase type that uses reflection to set a table name and entity type properties.
     /// </summary>
     /// <typeparam name="TEntity">The type of entity</typeparam>
-    public abstract class EntityBase<TEntity> : TableEntity where TEntity : AuditedEntityBase<TEntity>
+    public abstract class EntityBase<TEntity> : TableEntity where TEntity : ImmutableEntityBase<TEntity>, new()
     {
         protected static readonly string _entityType;
         protected static readonly string _tableName;
@@ -21,6 +65,7 @@ namespace Progression
         { 
             _entityType = typeof(TEntity).FullName;
             _tableName = GetTableName();
+            EntityRegistry.Register(typeof(TEntity));
         }
 
         public string TableName { get { return _tableName; } }
@@ -33,7 +78,7 @@ namespace Progression
         }
     }
 
-    public abstract class AuditedEntityBase<TEntity> : EntityBase<TEntity> where TEntity : AuditedEntityBase<TEntity>
+    public abstract class ImmutableEntityBase<TEntity> : EntityBase<TEntity> where TEntity : ImmutableEntityBase<TEntity>, new()
     {
         public string AuditRecord { get; set; }
         public int Version { get; set; }
@@ -50,7 +95,7 @@ namespace Progression
     }
 
     [TableName("Player")]
-    public class ProgressionEntity : AuditedEntityBase<ProgressionEntity>
+    public class ProgressionEntity : ImmutableEntityBase<ProgressionEntity>
     {
         #region constants
         private const string TitleId = "SomeGame";
@@ -63,12 +108,14 @@ namespace Progression
         }
         #endregion
 
+        public int Xp { get; set; }
+
         public ProgressionEntity(ulong playerId)
         {
             this.PartitionKey = MakePk(playerId);
         }
 
-        private static string MakePk(ulong playerId)
+        public static string MakePk(ulong playerId)
         {
             return string.Format("{0}_{1:x16}", TitleId, playerId);
         }

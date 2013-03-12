@@ -6,7 +6,7 @@ namespace Progression
 {
     public static class AsyncHelpers
     {
-        public static IEnumerable<TEntity> QueryAll<TEntity>(this CloudTable table, string filter) where TEntity : AuditedEntityBase<TEntity>, new()
+        public static IEnumerable<TEntity> QueryAll<TEntity>(this CloudTable table, string filter, EntityResolver<TEntity> resolver = null) where TEntity : TableEntity, new()
         {
             LogManager.GetCurrentClassLogger().Info("Query Filter: {0}", filter);
             var query = new TableQuery<TEntity>().Where(filter);
@@ -15,19 +15,18 @@ namespace Progression
             while (currentSegment == null || currentSegment.ContinuationToken != null)
             {
                 var token = currentSegment != null ? (TableContinuationToken)currentSegment.ContinuationToken : null;
-                currentSegment = table.ExecuteQuerySegmented(query, token);
+
+                currentSegment = resolver != null ? table.ExecuteQuerySegmented(query, resolver, token) : table.ExecuteQuerySegmented(query, token);
                 foreach (var item in currentSegment.Results)
-                {
                     yield return item;
-                }
             }
-            //Task.Factory.FromAsync<ResultSegment<TEntity>>(, table.EndExecuteQuerySegmented<TEntity>, query, null, null);
         }
+       
         public static async Task<bool> AsyncCreateIfNotExist(this CloudTable table)
         {
             return await Task.Factory.FromAsync<bool>(table.BeginCreateIfNotExists, table.EndCreateIfNotExists, null);
         }
-        public static async Task<TEntity> GetSingle<TEntity>(this CloudTable table, string pk, string rk) where TEntity : AuditedEntityBase<TEntity>, new()
+        public static async Task<TEntity> GetSingle<TEntity>(this CloudTable table, string pk, string rk) where TEntity : ImmutableEntityBase<TEntity>, new()
         {
             return (await table.AsyncExecute(TableOperation.Retrieve<TEntity>(pk, rk))).Result as TEntity;
         }
