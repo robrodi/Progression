@@ -27,20 +27,17 @@ namespace Progression
         public string EntityType { get; set; }
         public string AuditRecord { get; set; }
 
-        static readonly CloudTableClient tableClient = CloudStorageAccount.DevelopmentStorageAccount.CreateCloudTableClient();
         public AuditedEntityBase()
         {
-            table = GetTable();
             EntityType = _entityType;
         }
-        protected CloudTable GetTable() {  return GetTable(TableName); }
-        protected static CloudTable GetTable(string tableName) { return tableClient.GetTableReference(tableName); }
+
         protected readonly CloudTable table;
         public int Version { get; set; }
 
-        public async Task Save(string audit)
+        public async Task Save(CloudTable table, string audit)
         {
-            this.Version = Version + 1;
+            this.Version++;
             AuditRecord = audit;
             this.RowKey = MakeRowKey();
             await table.AsyncExecute(TableOperation.Insert((TEntity)this));
@@ -48,13 +45,13 @@ namespace Progression
     }
     public class ProgressionEntity : AuditedEntityBase<ProgressionEntity>, IThingy
     {
+        #region constants
         private const string TitleId = "SomeGame";
         private const string _tableName = "Player";
         private const string _rowKey = "Progression";
         private const string _rowKeyEnd = "Progression_~";
-
+        #endregion
         #region Table Stuff
-        static ProgressionEntity() { GetTable(_tableName).AsyncCreateIfNotExist().Wait(); }
         public override string TableName { get { return _tableName; } }
         public ProgressionEntity()
         {
@@ -77,19 +74,19 @@ namespace Progression
         private static string MakeRowKey(int version) { return string.Format("{0}_{1}", _rowKey, version); }
 
 
-        public static IEnumerable<ProgressionEntity> Get(ulong playerId) 
+        public static IEnumerable<ProgressionEntity> Get(CloudTable table, ulong playerId) 
         {
             string pkFilter = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, MakePk(playerId));
             string upperRKFilter = TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThan, _rowKeyEnd);
             string lowerRkFilter = TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThan, _rowKey);
             string combinedRowKeyFilter = TableQuery.CombineFilters(lowerRkFilter, TableOperators.And, upperRKFilter);
             string combinedFilter = TableQuery.CombineFilters(pkFilter, TableOperators.And, combinedRowKeyFilter);
-            return GetTable(_tableName).QueryAll<ProgressionEntity>(combinedFilter);
+            return table.QueryAll<ProgressionEntity>(combinedFilter);
         }
-   
-        public static async Task<ProgressionEntity> Get(ulong playerId, int version)
+
+        public static async Task<ProgressionEntity> Get(CloudTable table, ulong playerId, int version)
         {
-            return await GetTable(_tableName).GetSingle<ProgressionEntity>(MakePk(playerId), MakeRowKey(version));
+            return await table.GetSingle<ProgressionEntity>(MakePk(playerId), MakeRowKey(version));
         }
     }
 
