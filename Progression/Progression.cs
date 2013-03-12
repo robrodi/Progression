@@ -34,6 +34,7 @@ namespace Progression
             await table.AsyncExecute(TableOperation.Insert((TEntity)this));
         }
     }
+
     public class ProgressionEntity : AuditedEntityBase<ProgressionEntity>
     {
         #region constants
@@ -48,6 +49,7 @@ namespace Progression
         {
         }
         #endregion
+
 
         public ProgressionEntity(ulong playerId)
         {
@@ -64,15 +66,17 @@ namespace Progression
         }
         private static string MakeRowKey(int version) { return string.Format("{0}_{1}", _rowKey, version); }
 
-
-        public static IEnumerable<ProgressionEntity> Get(CloudTable table, ulong playerId) 
+        public static IEnumerable<ProgressionEntity> Get(CloudTable table, ulong playerId)
         {
-            string pkFilter = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, MakePk(playerId));
-            string upperRKFilter = TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThan, _rowKeyEnd);
-            string lowerRkFilter = TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThan, _rowKey);
-            string combinedRowKeyFilter = TableQuery.CombineFilters(lowerRkFilter, TableOperators.And, upperRKFilter);
-            string combinedFilter = TableQuery.CombineFilters(pkFilter, TableOperators.And, combinedRowKeyFilter);
-            return table.QueryAll<ProgressionEntity>(combinedFilter);
+            //string pkFilter = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, MakePk(playerId));
+            //string upperRKFilter = TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThan, _rowKeyEnd);
+            //string lowerRkFilter = TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThan, _rowKey);
+            //string combinedRowKeyFilter = TableQuery.CombineFilters(lowerRkFilter, TableOperators.And, upperRKFilter);
+            //string combinedFilter = TableQuery.CombineFilters(pkFilter, TableOperators.And, combinedRowKeyFilter);
+            //return table.QueryAll<ProgressionEntity>(combinedFilter);
+
+            // hax
+            return table.QueryAll<ProgressionEntity>(string.Format("(PartitionKey eq '{0}') and ((RowKey gt '{1}') and (RowKey lt '{1}_~'))", MakePk(playerId), _rowKey));
         }
 
         public static async Task<ProgressionEntity> Get(CloudTable table, ulong playerId, int version)
@@ -88,19 +92,19 @@ namespace Progression
             LogManager.GetCurrentClassLogger().Info("Query Filter: {0}", filter);
             var query = new TableQuery<TEntity>().Where(filter);
             TableQuerySegment<TEntity> currentSegment = null;
-            
+
             while (currentSegment == null || currentSegment.ContinuationToken != null)
             {
-                var token = currentSegment != null ? (TableContinuationToken) currentSegment.ContinuationToken : null;
+                var token = currentSegment != null ? (TableContinuationToken)currentSegment.ContinuationToken : null;
                 currentSegment = table.ExecuteQuerySegmented(query, token);
                 foreach (var item in currentSegment.Results)
                 {
-                    yield return item;   
+                    yield return item;
                 }
             }
             //Task.Factory.FromAsync<ResultSegment<TEntity>>(, table.EndExecuteQuerySegmented<TEntity>, query, null, null);
         }
-        public static async Task<bool> AsyncCreateIfNotExist(this CloudTable table) 
+        public static async Task<bool> AsyncCreateIfNotExist(this CloudTable table)
         {
             return await Task.Factory.FromAsync<bool>(table.BeginCreateIfNotExists, table.EndCreateIfNotExists, null);
         }
@@ -108,7 +112,7 @@ namespace Progression
         {
             return (await table.AsyncExecute(TableOperation.Retrieve<TEntity>(pk, rk))).Result as TEntity;
         }
-        public static async Task<TableResult> AsyncExecute(this CloudTable table, TableOperation operation) 
+        public static async Task<TableResult> AsyncExecute(this CloudTable table, TableOperation operation)
         {
             return await Task.Factory.FromAsync<TableOperation, TableResult>(table.BeginExecute, table.EndExecute, operation, null);
         }
