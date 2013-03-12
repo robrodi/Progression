@@ -36,6 +36,10 @@ namespace Tests
             var entity = new ProgressionEntity(xuid);
             entity.Save().Wait();
             entity.Save().Wait();
+            entity.Save().Wait();
+            entity.Save().Wait();
+            entity.Save().Wait();
+            entity.Save().Wait();
 
             for (var i = 1; i <= 2; i++)
             {

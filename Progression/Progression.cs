@@ -14,18 +14,23 @@ namespace Progression
         string TableName { get; }
         int Version { get; }
         string MakeRowKey();
-
+        string EntityType { get; }
     }
+
     public abstract class EBase<TEntity> : TableEntity where TEntity : EBase<TEntity>
     {
         public abstract string TableName { get; }
         public abstract string MakeRowKey();
+        public string EntityType { get; set; }
 
+        private static readonly string _entityType;
+        static EBase() { _entityType = typeof(TEntity).FullName; }
         protected Logger logger = LogManager.GetCurrentClassLogger();
         static readonly CloudTableClient tableClient = CloudStorageAccount.DevelopmentStorageAccount.CreateCloudTableClient();
         public EBase()
         {
             table = GetTable();
+            EntityType = _entityType;
         }
         protected CloudTable GetTable() {  return GetTable(TableName); }
         protected static CloudTable GetTable(string tableName) { return tableClient.GetTableReference(tableName); }
@@ -50,7 +55,6 @@ namespace Progression
         const string TitleId = "SomeGame";
         private const string _tableName = "Player";
         private const string _rowKey = "Progression";
-
         public override string TableName { get { return _tableName; } }
         public string WTF { get; set; }
         public ProgressionEntity()
