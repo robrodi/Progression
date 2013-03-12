@@ -1,0 +1,1 @@
+A test project for fiddling with Azure Storage 2.0.
