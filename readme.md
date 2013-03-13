@@ -9,6 +9,7 @@ Got nosql like storage working (see QueryAll)
 ## TODO
 * Simplify Generic Bases
 * Support batch saves
+* Support single "current" entity + history
 
 
 ## Resources:
