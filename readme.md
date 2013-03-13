@@ -1,13 +1,15 @@
 Progression
 ======
-### Summary
+## Summary
 A test project for fiddling with Azure Storage 2.0.
 
 ## Notes
 Got nosql like storage working (see QueryAll)
 
-### TODO
-Support batch saves
+## TODO
+* Simplify Generic Bases
+* Support batch saves
+
 
 ## Resources:
 [Windows Azure Storage Client Library 2.0 Tables Deep Dive]
